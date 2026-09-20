@@ -1,6 +1,6 @@
-# Project Title (Update)
+# Plannedfitness
 
-Add a description of your project here.
+Create a console application where one is able to track their workouts, meals, and weight. The user should expect to get daily and weekly summaries of their workouts, meals, and weight.
 
 ## Instructions for Build and Use
 

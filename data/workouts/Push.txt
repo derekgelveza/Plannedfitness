@@ -1,0 +1,35 @@
+{
+  "name": "Push",
+  "exercises": [
+    {
+      "name": "Incline Bench Press",
+      "reps": 6,
+      "sets": 2,
+      "restTimeMinutes": 3
+    },
+    {
+      "name": "Pec Dec",
+      "reps": 8,
+      "sets": 1,
+      "restTimeMinutes": 2
+    },
+    {
+      "name": "Shoulder Press",
+      "reps": 8,
+      "sets": 2,
+      "restTimeMinutes": 3
+    },
+    {
+      "name": "Rear Delt Flys",
+      "reps": 10,
+      "sets": 2,
+      "restTimeMinutes": 1
+    },
+    {
+      "name": "Tricep Pull down",
+      "reps": 6,
+      "sets": 2,
+      "restTimeMinutes": 2
+    }
+  ]
+}

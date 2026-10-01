@@ -1,0 +1,70 @@
+{
+  "workoutName": "Push",
+  "startedAt": "2026-10-01T20:23:18.798Z",
+  "completedAt": "2026-10-01T20:27:39.945Z",
+  "completedSets": [
+    {
+      "exerciseName": "Incline Bench Press",
+      "setNumber": 1,
+      "weight": 95,
+      "reps": 8,
+      "completedAt": "2026-10-01T20:23:28.596Z"
+    },
+    {
+      "exerciseName": "Incline Bench Press",
+      "setNumber": 2,
+      "weight": 95,
+      "reps": 6,
+      "completedAt": "2026-10-01T20:26:38.138Z"
+    },
+    {
+      "exerciseName": "Pec Dec",
+      "setNumber": 1,
+      "weight": 45,
+      "reps": 7,
+      "completedAt": "2026-10-01T20:26:45.426Z"
+    },
+    {
+      "exerciseName": "Shoulder Press",
+      "setNumber": 1,
+      "weight": 75,
+      "reps": 8,
+      "completedAt": "2026-10-01T20:27:09.121Z"
+    },
+    {
+      "exerciseName": "Shoulder Press",
+      "setNumber": 2,
+      "weight": 75,
+      "reps": 6,
+      "completedAt": "2026-10-01T20:27:15.930Z"
+    },
+    {
+      "exerciseName": "Rear Delt Flys",
+      "setNumber": 1,
+      "weight": 25,
+      "reps": 10,
+      "completedAt": "2026-10-01T20:27:23.969Z"
+    },
+    {
+      "exerciseName": "Rear Delt Flys",
+      "setNumber": 2,
+      "weight": 225,
+      "reps": 10,
+      "completedAt": "2026-10-01T20:27:27.913Z"
+    },
+    {
+      "exerciseName": "Tricep Pull down",
+      "setNumber": 1,
+      "weight": 95,
+      "reps": 8,
+      "completedAt": "2026-10-01T20:27:36.280Z"
+    },
+    {
+      "exerciseName": "Tricep Pull down",
+      "setNumber": 2,
+      "weight": 95,
+      "reps": 8,
+      "completedAt": "2026-10-01T20:27:39.944Z"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "workoutName": "legs",
+  "startedAt": "2026-10-03T19:01:23.826Z",
+  "completedAt": "2026-10-03T19:01:48.010Z",
+  "completedSets": [
+    {
+      "exerciseName": "squats",
+      "setNumber": 1,
+      "weight": 100,
+      "reps": 5,
+      "completedAt": "2026-10-03T19:01:37.323Z"
+    },
+    {
+      "exerciseName": "squats",
+      "setNumber": 2,
+      "weight": 100,
+      "reps": 5,
+      "completedAt": "2026-10-03T19:01:48.010Z"
+    }
+  ]
+}

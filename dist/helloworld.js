@@ -81,6 +81,14 @@ class WorkoutSession {
     getCompletedSets() {
         return this.completedSets;
     }
+    getProgress() {
+        const totalSets = this.workout
+            .getExercises()
+            .reduce((total, exercise) => total + exercise.sets, 0);
+        const completedSets = this.completedSets.length;
+        const percentage = totalSets === 0 ? 0 : (completedSets / totalSets) * 100;
+        return [completedSets, totalSets, percentage];
+    }
     getStartedAt() {
         return this.startedAt;
     }
@@ -285,6 +293,8 @@ class Main {
                 console.log(`${session.getWorkoutName()}\n`);
                 console.log(`${exercise.name} — Set ${session.getCurrentSetNumber()} of ${exercise.sets}`);
                 console.log(`Planned reps: ${exercise.reps}`);
+                const [completedSets, totalSets, percentage] = session.getProgress();
+                console.log(`Overall progress: ${completedSets}/${totalSets} sets (${percentage.toFixed(0)}%)`);
                 const weight = yield this.askForNonNegativeNumber(question, "Weight: ");
                 const reps = yield this.askForPositiveNumber(question, "Completed reps: ");
                 session.recordCompletedSet(weight, reps);

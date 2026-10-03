@@ -1,0 +1,11 @@
+{
+  "name": "legs",
+  "exercises": [
+    {
+      "name": "squats",
+      "reps": 5,
+      "sets": 2,
+      "restTimeMinutes": 3
+    }
+  ]
+}

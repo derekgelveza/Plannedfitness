@@ -1,43 +1,23 @@
-# Plannedfitness
+# EverythingFitness
 
-Create a console application where one is able to track their workouts, meals, and weight. The user should expect to get daily and weekly summaries of their workouts, meals, and weight.
+EverythingFitness is a TypeScript workout tracker backed by PostgreSQL. The terminal client and Express API share the same services and repositories.
 
-## Instructions for Build and Use
+## Setup
 
-Steps to build and/or run the software:
+1. Install Node.js and PostgreSQL.
+2. Create a local database, such as `everything_fitness_dev`.
+3. Copy `.env.example` to `.env` and set `DATABASE_URL`.
+4. Apply `src/database/schema.sql` to the database.
+5. Run `npm install` and `npm run build`.
 
-1. Download node.js
-2. Download TypeScript
-3. run tsc --init to create a tsconfig.json file
-4. Configure the compiler in tsconfig.json by setting rootDir to ./src and outDir to ./dist
+If the database was created with an earlier version of the app, apply `src/database/migrations/002_preserve_session_history.sql` once before using workout deletion.
 
-Instructions for using the software:
+To import the existing text-file backups once the schema is ready, run `npm run migrate`. The original files are retained.
 
-1. Create a src directory and place .ts file(s) in there
-2. Compile project by running tsc in the terminal, which makes the compiler translate TS files into JS inside the  dist folder
-3. Execute the compiled JS using node dist/(filename).js
+## Run
 
-## Development Environment
+- `npm run cli` starts the terminal application.
+- `npm start` starts the API on `PORT` (default `3000`).
+- `GET /health` checks that the API process is running.
 
-To recreate the development environment, you need the following software and/or libraries with the specified versions:
-
-* Node.js
-* TypeScript Compiler
-* TypeScript Config file
-
-## Useful Websites to Learn More
-
-I found these websites useful in developing this software:
-
-* [Youtube](https://www.youtube.com/watch?v=d56mG7DezGs)
-*
-*
-
-## Future Work
-
-The following items I plan to fix, improve, and/or add to this project in the future:
-
-* [ ] Define features
-* [ ] Create samples within arrays
-* [ ] Create functions handling calculations 
-* [ ] Print daily and weekly summaries
+The API endpoints are documented in `IMPLEMENTATION_GUIDE.md`. Database credentials belong in `.env`, which is excluded from source control.

@@ -14,6 +14,15 @@
  *   - $1, $2, ... are query PARAMETERS. pg sends the values separately from
  *     the SQL text, which prevents SQL injection. Never build SQL by
  *     concatenating user input.
+ *
+ * CHANGES FOR THE FRONTEND:
+ *   - create() and update() now re-read the workout before returning, so the
+ *     returned exercises carry their real database ids (the app needs them
+ *     to edit the workout again and to look up previous weights/reps).
+ *   - update() no longer deletes and re-inserts every exercise. It updates
+ *     the rows the caller kept (matched by id), inserts the new ones and
+ *     deletes only the ones that were removed. Exercise ids stay stable, so
+ *     history (completed_sets.exercise_id) keeps pointing at them.
  */
 import type { PoolClient } from "pg";
 import { pool } from "../database/connection.js";
@@ -25,6 +34,9 @@ type WorkoutRow = { id: number; name: string };
 
 /** Shape of a row from the `exercises` table (snake_case, like the columns). */
 type ExerciseRow = { id: number; workout_id: number; name: string; reps: number; sets: number; rest_time_minutes: number; exercise_order: number };
+
+/** Anything with a .query() method: the shared pool OR one borrowed connection. */
+type Queryable = PoolClient | typeof pool;
 
 /**
  * Convert database rows into a Workout object.
@@ -46,26 +58,32 @@ function toWorkout(row: WorkoutRow, exercises: ExerciseRow[]): Workout {
 }
 
 /**
- * Load exercise rows, either for specific workouts or (if `workoutIds` is
- * omitted) for every workout.
- *
- * `client` can be the pool or a single borrowed connection, since both have
- * a .query() method.
+ * Load exercise rows for the given workouts in ONE query.
  *
  * `workout_id = ANY($1::bigint[])` is Postgres for "workout_id is in this
  * array" — it lets us pass a JS array as one parameter. Loading all
  * exercises in one query (instead of one query per workout) avoids the
  * "N+1 queries" performance problem.
  *
- * REVIEW NOTE: the "no workoutIds" branch isn't used by anything right now.
+ * (The old "no workoutIds = load everything" branch was unused and has been
+ * removed.)
  */
-async function loadExercises(client: PoolClient | typeof pool, workoutIds?: number[]): Promise<ExerciseRow[]> {
+async function loadExercises(client: Queryable, workoutIds: number[]): Promise<ExerciseRow[]> {
     // Empty list → nothing to load; skip the round-trip to the database.
-    if (workoutIds && workoutIds.length === 0) return [];
-    const result = workoutIds
-        ? await client.query<ExerciseRow>("SELECT id, workout_id, name, reps, sets, rest_time_minutes, exercise_order FROM exercises WHERE workout_id = ANY($1::bigint[]) ORDER BY exercise_order", [workoutIds])
-        : await client.query<ExerciseRow>("SELECT id, workout_id, name, reps, sets, rest_time_minutes, exercise_order FROM exercises ORDER BY exercise_order");
+    if (workoutIds.length === 0) return [];
+    const result = await client.query<ExerciseRow>(
+        "SELECT id, workout_id, name, reps, sets, rest_time_minutes, exercise_order FROM exercises WHERE workout_id = ANY($1::bigint[]) ORDER BY exercise_order",
+        [workoutIds]
+    );
     return result.rows;
+}
+
+/** Load one workout + exercises using whichever connection we're given. */
+async function loadWorkout(client: Queryable, id: number): Promise<Workout | null> {
+    const result = await client.query<WorkoutRow>("SELECT id, name FROM workouts WHERE id = $1", [id]);
+    const row = result.rows[0];
+    if (!row) return null;
+    return toWorkout(row, await loadExercises(client, [id]));
 }
 
 export class WorkoutRepository {
@@ -88,12 +106,14 @@ export class WorkoutRepository {
             const row = result.rows[0];
             if (!row) throw new Error("Workout insert returned no row.");
             const workoutId = Number(row.id);
-            await this.insertExercises(client, workoutId, workout);
+            // Every exercise is new here, so insert them all at their array positions.
+            for (const [index, exercise] of workout.getExercises().entries()) await this.insertExercise(client, workoutId, exercise, index + 1);
+            // Re-read inside the same transaction so the returned exercises
+            // include their freshly generated ids.
+            const saved = await loadWorkout(client, workoutId);
             await client.query("COMMIT");
-            // Build the result from what we sent rather than re-reading the DB.
-            // REVIEW NOTE: the returned exercises have id = undefined (their new
-            // database ids aren't fetched). Call findById() if you need them.
-            return new Workout(row.name, [...workout.getExercises()].map((e, i) => new Exercise(e.name, e.reps, e.sets, e.restTimeMinutes, undefined, i + 1)), workoutId);
+            if (!saved) throw new Error("Workout disappeared after insert.");
+            return saved;
         } catch (error) {
             await client.query("ROLLBACK");
             throw error; // re-throw so the caller still sees the failure
@@ -107,49 +127,77 @@ export class WorkoutRepository {
     /** Every workout (sorted by name, then id), each with its exercises. Two queries total. */
     async findAll(): Promise<Workout[]> {
         const result = await pool.query<WorkoutRow>("SELECT id, name FROM workouts ORDER BY name, id");
-        const exercises = await loadExercises(pool, result.rows.map((r) => r.id));
+        const exercises = await loadExercises(pool, result.rows.map((r) => Number(r.id)));
         return result.rows.map((r) => toWorkout(r, exercises));
     }
 
     /** One workout with its exercises, or null if the id doesn't exist. */
     async findById(id: number): Promise<Workout | null> {
-        const result = await pool.query<WorkoutRow>("SELECT id, name FROM workouts WHERE id = $1", [id]);
-        const row = result.rows[0];
-        if (!row) return null;
-        return toWorkout(row, await loadExercises(pool, [id]));
+        return loadWorkout(pool, id);
     }
 
     /**
-     * Replace a workout's name and its whole exercise list (in a transaction).
+     * Replace a workout's name and exercise list (in a transaction).
      * Returns null if no workout has that id.
      *
-     * Strategy: rather than figuring out which exercises changed, it DELETES
-     * all of the workout's exercises and INSERTS the new list.
+     * Strategy ("diff" instead of "delete everything"):
+     *   1. Rename the workout.
+     *   2. Read the ids of the exercises it currently has.
+     *   3. For each exercise in the new list:
+     *        - has an id that belongs to THIS workout → UPDATE that row
+     *        - no id (or an id from some other workout) → INSERT a new row
+     *   4. DELETE the old rows whose id wasn't in the new list (the user
+     *      removed them).
+     * exercise_order is always rewritten from the array position, so
+     * reordering in the app just works.
      *
-     * REVIEW NOTE: because exercises are deleted and recreated, they get NEW
-     * ids every time a workout is edited. Due to `ON DELETE SET NULL` in the
-     * schema, every past completed_sets row for this workout loses its
-     * exercise_id link. History still has exercise_name, and the terminal
-     * app falls back to matching by name, so it mostly works — but if you
-     * rename an exercise, old history can no longer be matched to it.
+     * Because kept exercises keep their ids, completed_sets rows stay linked
+     * to them — the old version broke that link on every edit.
      */
     async update(id: number, workout: Workout): Promise<Workout | null> {
         const client = await pool.connect();
         try {
             await client.query("BEGIN");
             const result = await client.query<WorkoutRow>("UPDATE workouts SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name", [workout.name, id]);
-            const row = result.rows[0];
-            if (!row) {
+            if (!result.rows[0]) {
                 // No such workout: undo the (empty) transaction and report "not found".
                 await client.query("ROLLBACK");
                 return null;
             }
-            const workoutId = Number(row.id);
-            await client.query("DELETE FROM exercises WHERE workout_id = $1", [id]);
-            await this.insertExercises(client, workoutId, workout);
+
+            // Step 2: which exercise ids does this workout own right now?
+            // A Set gives fast "is this id one of them?" checks.
+            const existing = await client.query<{ id: number }>("SELECT id FROM exercises WHERE workout_id = $1", [id]);
+            const existingIds = new Set(existing.rows.map((r) => Number(r.id)));
+            const keptIds: number[] = [];
+
+            // Step 3: update or insert, in the order the user arranged them.
+            for (const [index, exercise] of workout.getExercises().entries()) {
+                const order = index + 1;
+                if (exercise.id !== undefined && existingIds.has(exercise.id)) {
+                    await client.query(
+                        "UPDATE exercises SET name = $1, reps = $2, sets = $3, rest_time_minutes = $4, exercise_order = $5 WHERE id = $6",
+                        [exercise.name, exercise.reps, exercise.sets, exercise.restTimeMinutes, order, exercise.id]
+                    );
+                    keptIds.push(exercise.id);
+                } else {
+                    // An id we don't recognize is treated as a new exercise
+                    // rather than trusted — a client can't edit another
+                    // workout's exercise by sending its id.
+                    // The new row's id goes into keptIds too, otherwise step 4
+                    // would delete the exercise we just added.
+                    keptIds.push(await this.insertExercise(client, id, exercise, order));
+                }
+            }
+
+            // Step 4: delete whatever the user removed (every row that is
+            // neither kept nor just inserted). `<> ALL(array)` means "not
+            // equal to any element of the array".
+            await client.query("DELETE FROM exercises WHERE workout_id = $1 AND id <> ALL($2::bigint[])", [id, keptIds]);
+
+            const saved = await loadWorkout(client, id);
             await client.query("COMMIT");
-            // Same as create(): returned exercises don't carry their new ids.
-            return new Workout(row.name, [...workout.getExercises()].map((e, i) => new Exercise(e.name, e.reps, e.sets, e.restTimeMinutes, undefined, i + 1)), workoutId);
+            return saved;
         } catch (error) {
             await client.query("ROLLBACK");
             throw error;
@@ -170,14 +218,16 @@ export class WorkoutRepository {
     }
 
     /**
-     * Insert each exercise of `workout`, one INSERT per exercise.
-     * exercise_order is taken from the exercise's position in the array
-     * (index 0 → order 1), not from any exerciseOrder value on the object.
+     * Insert one exercise row and return its new id.
      * Must be called inside a transaction, with that transaction's client.
      */
-    private async insertExercises(client: PoolClient, workoutId: number, workout: Workout): Promise<void> {
-        // .entries() yields [index, value] pairs.
-        for (const [index, exercise] of workout.getExercises().entries())
-            await client.query("INSERT INTO exercises (workout_id, name, reps, sets, rest_time_minutes, exercise_order) VALUES ($1, $2, $3, $4, $5, $6)", [workoutId, exercise.name, exercise.reps, exercise.sets, exercise.restTimeMinutes, index + 1]);
+    private async insertExercise(client: PoolClient, workoutId: number, exercise: Exercise, order: number): Promise<number> {
+        const result = await client.query<{ id: number }>(
+            "INSERT INTO exercises (workout_id, name, reps, sets, rest_time_minutes, exercise_order) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+            [workoutId, exercise.name, exercise.reps, exercise.sets, exercise.restTimeMinutes, order]
+        );
+        const row = result.rows[0];
+        if (!row) throw new Error("Exercise insert returned no row.");
+        return Number(row.id);
     }
 }

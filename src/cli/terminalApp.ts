@@ -148,7 +148,11 @@ export class TerminalApp {
         const workout = await this.workouts.getWorkout(workoutId);
         const name = workout.name; // the workout name can't be changed from this screen
         // Copy exercises into plain editable objects (Exercise instances are readonly).
-        const exercises = [...workout.getExercises()].map((exercise) => ({ name: exercise.name, reps: exercise.reps, sets: exercise.sets, restTimeMinutes: exercise.restTimeMinutes }));
+        // The id is carried along (when there is one) so updateWorkout() edits
+        // the existing rows instead of replacing them, which keeps each
+        // exercise linked to its past sets. editExercise() returns
+        // `{ ...exercise, field }`, so the id survives edits too.
+        const exercises = [...workout.getExercises()].map((exercise) => ({ ...(exercise.id !== undefined ? { id: exercise.id } : {}), name: exercise.name, reps: exercise.reps, sets: exercise.sets, restTimeMinutes: exercise.restTimeMinutes }));
         while (true) {
             console.clear(); console.log("Which exercise would you like to edit? Or would you like to add an exercise? If you wish to exit enter 0\n");
             exercises.forEach((exercise, index) => console.log(`${index + 1}. ${exercise.name}`));

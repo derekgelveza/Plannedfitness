@@ -6,15 +6,15 @@
  */
 import { Router } from "express";
 import { createWorkout, deleteWorkout, getWorkout, listWorkouts, updateWorkout } from "../controllers/workoutController.js";
-import { startSession } from "../controllers/sessionController.js";
+import { getPrevious, startSession } from "../controllers/sessionController.js";
 
 export const workoutRoutes = Router();
 
-// GET /            list all workouts
-// GET /:id         one workout
-// POST /           create a workout          (body: { name, exercises: [...] })
-// PUT /:id         replace a workout         (same body as create)
-// DELETE /:id      delete a workout
-// POST /:id/sessions  start a session for this workout. It lives here (not in
-//                     sessionRoutes) because the URL is "under" a workout.
-workoutRoutes.get("/", listWorkouts); workoutRoutes.get("/:id", getWorkout); workoutRoutes.post("/", createWorkout); workoutRoutes.put("/:id", updateWorkout); workoutRoutes.delete("/:id", deleteWorkout); workoutRoutes.post("/:id/sessions", startSession);
+workoutRoutes.get("/", listWorkouts);             // list all workouts
+workoutRoutes.get("/:id", getWorkout);            // one workout
+workoutRoutes.post("/", createWorkout);           // create (body: { name, exercises: [...] })
+workoutRoutes.put("/:id", updateWorkout);         // replace (same body; include exercise ids to keep them)
+workoutRoutes.delete("/:id", deleteWorkout);      // delete a workout (history is kept)
+// These two live here (not in sessionRoutes) because the URL is "under" a workout.
+workoutRoutes.get("/:id/previous", getPrevious);  // NEW: last weights/reps for each exercise
+workoutRoutes.post("/:id/sessions", startSession); // start a session for this workout

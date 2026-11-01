@@ -17,8 +17,8 @@ const service = new WorkoutService();
 const id = (request: Request): number => Number(request.params.id);
 
 // GET /api/workouts → 200 + array of workouts.
-// Note: response.json() serializes the Workout objects; the private
-// `exercises` field is still included, since JSON.stringify ignores TS privacy.
+// response.json() calls Workout.toJSON() on each workout, which defines the
+// exact { id, name, exercises: [...] } shape the frontend expects.
 export async function listWorkouts(_request: Request, response: Response): Promise<void> { response.json(await service.listWorkouts()); }
 
 // GET /api/workouts/:id → 200 + workout, or 404.
@@ -29,6 +29,7 @@ export async function getWorkout(request: Request, response: Response): Promise<
 export async function createWorkout(request: Request, response: Response): Promise<void> { response.status(201).json(await service.createWorkout(request.body)); }
 
 // PUT /api/workouts/:id → 200 + updated workout, or 404 / 400.
+// Send each kept exercise's `id` so it's updated in place (keeps its history).
 export async function updateWorkout(request: Request, response: Response): Promise<void> { response.json(await service.updateWorkout(id(request), request.body)); }
 
 // DELETE /api/workouts/:id → 204 No Content (success, empty body), or 404.

@@ -7,6 +7,16 @@
  */
 import { Exercise } from "./Exercise.js";
 
+/**
+ * NEW: the exact JSON shape the API sends for a workout. The React Native
+ * app has a matching type in frontend/src/api/types.ts — keep them in sync.
+ */
+export type WorkoutJson = {
+    id: number | undefined;
+    name: string;
+    exercises: Array<{ id: number | undefined; name: string; reps: number; sets: number; restTimeMinutes: number; exerciseOrder: number | undefined }>;
+};
+
 export class Workout {
     // Kept private so outside code can't swap out the array; they must go
     // through addExercise() / getExercises().
@@ -35,4 +45,22 @@ export class Workout {
      * guarantee only — it's the same array object at runtime).
      */
     getExercises(): readonly Exercise[] { return this.exercises; }
+
+    /**
+     * NEW: controls what `response.json(workout)` / JSON.stringify(workout)
+     * produces. JSON.stringify automatically calls a method named toJSON() if
+     * the object has one.
+     *
+     * Before, the API leaked the private field layout by accident (it worked
+     * only because JSON.stringify ignores TypeScript's `private`). Making the
+     * shape explicit means the frontend can rely on it, and changing the
+     * class internals later won't silently break the app.
+     */
+    toJSON(): WorkoutJson {
+        return {
+            id: this.id,
+            name: this.name,
+            exercises: this.exercises.map((e) => ({ id: e.id, name: e.name, reps: e.reps, sets: e.sets, restTimeMinutes: e.restTimeMinutes, exerciseOrder: e.exerciseOrder })),
+        };
+    }
 }

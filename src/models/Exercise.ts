@@ -10,6 +10,15 @@
 
 /** Raw exercise data from a request body / CLI. Validated in WorkoutService.toWorkout(). */
 export type ExerciseInput = {
+    /**
+     * NEW: the database id of an exercise that already exists.
+     * When editing a workout, the frontend sends the id back for every
+     * exercise it kept. WorkoutRepository.update() then UPDATES that row
+     * instead of deleting and re-inserting it, so the exercise keeps its id
+     * and its link to past completed sets (needed for "previous weight/reps").
+     * Leave it out for brand-new exercises.
+     */
+    id?: number;
     name: string;
     reps: number;
     sets: number;
